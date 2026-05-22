@@ -79,3 +79,12 @@ def test_numeric_field_values_coerced_to_str() -> None:
 
     counts = sc.field_counts("code")
     assert counts["200"] == 2
+
+
+def test_field_counts_raises_for_untracked_field() -> None:
+    """Requesting counts for a field not in count_fields should raise KeyError."""
+    sc = StatsCollector(count_fields=["level"])
+    sc.record({"level": "info", "status": "200"}, matched=True)
+
+    with pytest.raises(KeyError):
+        sc.field_counts("status")
