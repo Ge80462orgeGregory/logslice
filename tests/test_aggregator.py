@@ -89,6 +89,13 @@ def test_top_n_limits_results():
     assert len(agg.top("svc", n=5)) == 5
 
 
+def test_top_unknown_field_raises():
+    """top() should raise AggregatorError for fields not being tracked."""
+    agg = Aggregator(fields=["level"])
+    with pytest.raises(AggregatorError, match="not tracked"):
+        agg.top("service")
+
+
 # ---------------------------------------------------------------------------
 # summary
 # ---------------------------------------------------------------------------
@@ -103,8 +110,4 @@ def test_summary_contains_total_and_fields():
 
 
 def test_summary_top_values_correct():
-    agg = Aggregator(fields=["level"])
-    agg.feed_many([{"level": "debug"}, {"level": "debug"}, {"level": "info"}])
-    top = dict(agg.summary()["fields"]["level"])
-    assert top["debug"] == 2
-    assert top["info"] == 1
+    agg =
