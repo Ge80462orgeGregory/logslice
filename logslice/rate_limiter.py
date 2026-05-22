@@ -23,14 +23,16 @@ class RateLimiter:
         self._window = window_seconds
         self._timestamps: deque = deque()
 
+    def _evict_expired(self, now: float) -> None:
+        """Remove timestamps that have fallen outside the sliding window."""
+        cutoff = now - self._window
+        while self._timestamps and self._timestamps[0] < cutoff:
+            self._timestamps.popleft()
+
     def allow(self) -> bool:
         """Return True if the current line is within the rate limit, False otherwise."""
         now = time.monotonic()
-        cutoff = now - self._window
-
-        # Evict timestamps outside the sliding window
-        while self._timestamps and self._timestamps[0] < cutoff:
-            self._timestamps.popleft()
+        self._evict_expired(now)
 
         if len(self._timestamps) >= self._max:
             return False
@@ -49,8 +51,8 @@ class RateLimiter:
     def current_count(self) -> int:
         """Number of lines recorded within the current window."""
         now = time.monotonic()
-        cutoff = now - self._window
-        return sum(1 for ts in self._timestamps if ts >= cutoff)
+        self._evict_expired(now)
+        return len(self._timestamps)
 
     def reset(self) -> None:
         """Clear all recorded timestamps."""
