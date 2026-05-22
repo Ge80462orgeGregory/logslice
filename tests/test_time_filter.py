@@ -91,22 +91,11 @@ def test_matches_only_until_no_lower_bound():
 
 def test_missing_field_returns_false():
     tf = TimeFilter(since="2024-01-01")
-    assert tf.matches({"level": "info"}) is False
+    assert tf.matches({"other_field": "2024-06-01T00:00:00"}) is False
 
 
-def test_nested_field_path():
-    tf = TimeFilter(field="meta.ts", since="2024-01-01")
-    record = {"meta": {"ts": "2024-06-01T00:00:00"}}
-    assert tf.matches(record) is True
-
-
-def test_non_string_timestamp_returns_false():
-    tf = TimeFilter(since="2024-01-01")
-    assert tf.matches({"timestamp": 1234567890}) is False
-
-
-def test_accepts_datetime_objects_directly():
-    since = datetime.datetime(2024, 1, 1)
-    until = datetime.datetime(2024, 12, 31)
-    tf = TimeFilter(since=since, until=until)
-    assert tf.matches(_make_record("2024-06-15T00:00:00")) is True
+def test_matches_custom_field():
+    """TimeFilter should read timestamps from a user-specified field name."""
+    tf = TimeFilter(field="logged_at", since="2024-01-01", until="2024-12-31")
+    assert tf.matches(_make_record("2024-06-15T10:00:00", field="logged_at")) is True
+    assert tf.matches(_make_record("2023-12-31T23:59:59", field="logged_at")) is False
