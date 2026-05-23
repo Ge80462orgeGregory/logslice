@@ -58,23 +58,36 @@ def run_join_cli(argv: Optional[List[str]] = None) -> int:  # noqa: D401
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    if args.input:
-        try:
-            primary = open(args.input, "r", encoding="utf-8")
-        except OSError as exc:
-            print(f"error: cannot open input file: {exc}", file=sys.stderr)
-            return 1
-    else:
-        primary = sys.stdin
+    primary = _open_primary(args.input)
+    if primary is None:
+        return 1
 
     try:
         for line in jf.process(primary):
             print(line)
+    except JoinError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     finally:
         if args.input:
             primary.close()
 
     return 0
+
+
+def _open_primary(path: Optional[str]):
+    """Open the primary log file for reading, or return stdin if *path* is None.
+
+    Returns the opened file object on success, or ``None`` on error (after
+    printing a message to stderr).
+    """
+    if path is None:
+        return sys.stdin
+    try:
+        return open(path, "r", encoding="utf-8")
+    except OSError as exc:
+        print(f"error: cannot open input file: {exc}", file=sys.stderr)
+        return None
 
 
 def main() -> None:  # pragma: no cover
