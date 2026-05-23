@@ -57,6 +57,19 @@ class Aggregator:
             self.counts(field).items(), key=lambda kv: kv[1], reverse=True
         )[:n]
 
+    def coverage(self, field: str) -> float:
+        """Return the fraction of total records that contained *field*.
+
+        Returns a float in the range [0.0, 1.0], or 0.0 when no records
+        have been fed yet.
+        """
+        if self._total == 0:
+            return 0.0
+        present = sum(self._counts[field].values()) if field in self._counts else 0
+        if field not in self._counts:
+            raise AggregatorError(f"Field {field!r} is not tracked.")
+        return present / self._total
+
     @property
     def total(self) -> int:
         """Total number of records fed."""
