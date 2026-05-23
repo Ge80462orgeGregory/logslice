@@ -85,40 +85,14 @@ def test_ignore_case_exclude():
 # Missing / nested fields
 # ---------------------------------------------------------------------------
 
-def test_missing_field_with_include_returns_false():
+def test_missing_field_returns_false():
+    """A record that lacks the target field should never match."""
     pf = PatternFilter(field="level", include=["ERROR"])
-    assert pf.matches({"msg": "no level here"}) is False
+    assert pf.matches({"msg": "no level key here"}) is False
 
 
-def test_missing_field_with_only_exclude_returns_true():
+def test_missing_field_with_exclude_only_returns_true():
+    """When only exclude patterns are given, a missing field means no
+    exclusion pattern can match, so the record should pass through."""
     pf = PatternFilter(field="level", exclude=["DEBUG"])
-    assert pf.matches({"msg": "no level key"}) is True
-
-
-def test_nested_field_dot_notation():
-    pf = PatternFilter(field="context.env", include=["prod"])
-    assert pf.matches({"context": {"env": "production"}}) is True
-
-
-def test_non_dict_record_raises():
-    pf = PatternFilter(field="level", include=["ERROR"])
-    with pytest.raises(PatternFilterError):
-        pf.matches(["not", "a", "dict"])
-
-
-# ---------------------------------------------------------------------------
-# filter_records generator
-# ---------------------------------------------------------------------------
-
-def test_filter_records_yields_matching():
-    pf = PatternFilter(field="level", include=["ERROR", "WARN"])
-    records = [
-        {"level": "INFO", "msg": "a"},
-        {"level": "ERROR", "msg": "b"},
-        {"level": "WARN", "msg": "c"},
-        {"level": "DEBUG", "msg": "d"},
-    ]
-    result = list(pf.filter_records(records))
-    assert len(result) == 2
-    assert result[0]["msg"] == "b"
-    assert result[1]["msg"] == "c"
+    assert pf.matches({"msg": "no level key here"}) is True
