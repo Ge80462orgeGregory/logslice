@@ -1,68 +1,81 @@
-"""Utility for extracting and flattening fields from parsed JSON log records."""
+"""Utilities for flattening and extracting fields from nested JSON records."""
+from __future__ import annotations
 
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 
 class FieldExtractorError(Exception):
-    """Raised when field extraction encounters an unrecoverable error."""
+    """Raised when a field extraction operation cannot be completed."""
 
 
 def _flatten(
     obj: Any,
-    prefix: str = "",
-    separator: str = ".",
-) -> Iterator[Tuple[str, Any]]:
-    """Recursively yield (dotted_key, value) pairs from a nested dict."""
+    parent_key: str,
+    separator: str,
+    result: Dict[str, Any],
+) -> None:
     if isinstance(obj, dict):
-        for key, value in obj.items():
-            full_key = f"{prefix}{separator}{key}" if prefix else key
-            yield from _flatten(value, full_key, separator)
+        for k, v in obj.items():
+            new_key = f"{parent_key}{separator}{k}" if parent_key else k
+            _flatten(v, new_key, separator, result)
     elif isinstance(obj, list):
-        for index, item in enumerate(obj):
-            full_key = f"{prefix}{separator}{index}" if prefix else str(index)
-            yield from _flatten(item, full_key, separator)
+        for i, v in enumerate(obj):
+            new_key = f"{parent_key}{separator}{i}" if parent_key else str(i)
+            _flatten(v, new_key, separator, result)
     else:
-        yield prefix, obj
+        result[parent_key] = obj
 
 
-def flatten_record(record: Dict[str, Any], separator: str = ".") -> Dict[str, Any]:
-    """Return a flat dict of dotted keys to scalar values for *record*."""
+def flatten_record(
+    record: Any,
+    separator: str = ".",
+    prefix: str = "",
+) -> Dict[str, Any]:
+    """Return a flat dict with dot-notation keys from a nested dict."""
     if not isinstance(record, dict):
         raise FieldExtractorError(
-            f"Expected a dict record, got {type(record).__name__}"
+            f"flatten_record expects a dict, got {type(record).__name__}"
         )
-    return dict(_flatten(record, separator=separator))
+    result: Dict[str, Any] = {}
+    _flatten(record, prefix, separator, result)
+    # If prefix was given, keys start with "prefix.original" — strip leading sep
+    if prefix:
+        stripped: Dict[str, Any] = {}
+        lead = prefix + separator
+        for k, v in result.items():
+            stripped[k[len(lead):] if k.startswith(lead) else k] = v
+        # Re-add prefix to all keys
+        return {f"{prefix}{separator}{k}": v for k, v in stripped.items()}
+    return result
 
 
-def extract_field(record: Dict[str, Any], field_path: str) -> Optional[Any]:
-    """Return the value at *field_path* (dot-separated) or None if absent."""
-    parts = field_path.split(".")
+def extract_field(record: Dict[str, Any], field: str, separator: str = ".") -> Any:
+    """Retrieve a possibly-nested field value using dot notation."""
+    parts = field.split(separator)
     current: Any = record
     for part in parts:
-        if isinstance(current, dict):
-            if part not in current:
-                return None
-            current = current[part]
-        elif isinstance(current, list):
-            try:
-                current = current[int(part)]
-            except (ValueError, IndexError):
-                return None
-        else:
-            return None
+        if not isinstance(current, dict):
+            raise FieldExtractorError(
+                f"Cannot traverse into non-dict at segment '{part}' of field '{field}'"
+            )
+        if part not in current:
+            raise FieldExtractorError(f"Field '{field}' not found in record")
+        current = current[part]
     return current
 
 
 def extract_fields(
-    record: Dict[str, Any], field_paths: List[str]
+    record: Dict[str, Any],
+    fields: List[str],
+    separator: str = ".",
+    skip_missing: bool = False,
 ) -> Dict[str, Any]:
-    """Return a dict mapping each requested field path to its extracted value.
-
-    Fields that are absent in *record* are omitted from the result.
-    """
-    result: Dict[str, Any] = {}
-    for path in field_paths:
-        value = extract_field(record, path)
-        if value is not None:
-            result[path] = value
-    return result
+    """Extract multiple fields, returning a dict of field -> value."""
+    out: Dict[str, Any] = {}
+    for f in fields:
+        try:
+            out[f] = extract_field(record, f, separator)
+        except FieldExtractorError:
+            if not skip_missing:
+                raise
+    return out
