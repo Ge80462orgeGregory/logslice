@@ -91,3 +91,17 @@ def test_render_max_bar_for_highest_bucket():
     output = h.render(bar_width=10)
     first_line = output.splitlines()[0]
     assert "##########" in first_line
+
+
+def test_reset_clears_state():
+    """Verify that reset() returns the histogram to a clean initial state."""
+    h = Histogram("latency", bucket_size=10.0)
+    h.feed_many([{"latency": 5}, {"latency": 15}, {"other": 99}])
+    assert h.total == 2
+    assert h.skipped == 1
+
+    h.reset()
+
+    assert h.total == 0
+    assert h.skipped == 0
+    assert h.buckets() == []
